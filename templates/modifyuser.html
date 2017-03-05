@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block body %}
+ <div class="panel panel-default">
+  <!-- Default panel contents -->
+  <div class="panel-heading">List of All Users</div>
+  <div class="panel-body">
+    <p>Below is a list of all current users</p>
+  </div>
+
+  <!-- Table -->
+  <table class="table" id="usertable">
+    <tr>
+      <td class="col-md-6"><b>First Name</b></td>
+      <td class="col-md-6"><b>Last Name</b></td>
+      <td class="col-md-6"><b>Login</b></td>
+      <td class="col-md-6"><b>Email</b></td>
+      <td class="col-md-6"><b>Status</b></td>
+    </tr>
+    {% for user in results %}
+    <tr>
+     <td class="col-md-6">{{ user.profile.firstName }}</td>
+     <td class="col-md-6">{{ user.profile.lastName }}</td>
+     <td class="col-md-6">{{ user.profile.login }}</td>
+     <td class="col-md-6">{{ user.profile.email }}</td>
+     <td class="col-md-6">{{ user.status }}</td>
+   </tr>
+   {% endfor %}
+  </table>
+</div>
+
+<h1 style="color:white;"> Reset Password </h1><br>
+<form id="regform" method="post" action="/changeuser">
+  <div class="form-group">
+    <label for="login">User Login Name</label>
+    <input type="text" class="form-control" name="login" placeholder="Enter login">
+  </div>
+  <button type="submit" class="btn btn-primary">Submit</button>
+</form>
+{% endblock %}

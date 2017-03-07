@@ -38,17 +38,20 @@
               <li class="active"><a href="/">Home</a></li>
             </ul>
             <ul class="nav navbar-nav navbar-right">
-              <li class="active"><a href="/registration">Register <span class="sr-only">(current)</span></a></li>
+              {% if 'user' in opts and opts['user'].is_authenticated() %}
+              <li>{{user}}</li>
               <li role="presentation" class="dropdown">
                 <a class="dropdown-toggle" data-toggle="dropdown" href="#" role="button" aria-haspopup="true" aria-expanded="false">
                 Admin <span class="caret"></span>
                 </a>
                 <ul class="dropdown-menu">
-                  <li><a href="/adminlistusers">List All Users</a></li>
-                  <li><a href="/deleteuser">Deactivate a User</a></li>
-                  <li><a href="/changeuser">Reset User Password</a></li>
+                  <li><a href="/admin_list_users">List All Users</a></li>
+                  <li><a href="/delete_user">Deactivate a User</a></li>
+                  <li><a href="/change_user">Reset User Password</a></li>
                 </ul>
               </li>
+              <li><a href="/logout">Log out</a></li>
+              {% endif %}
             </ul>
           </div><!--/.nav-collapse -->
         </div><!--/.container-fluid -->

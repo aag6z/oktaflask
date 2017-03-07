@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block body %}
+    <div class="container">
+      <div class="col-md-6">
+        {% if opts['invalid_username_or_password'] %}
+        <div class="alert alert-danger" role="alert">
+          <button type="button" class="close" data-dismiss="alert">&times;</button>
+          Incorrect Username or Password.
+        </div>
+        {% endif %}
+        {% if opts['account_not_active'] %}
+        <div class="alert alert-error">
+          <button type="button" class="close" data-dismiss="alert">&times;</button>
+          Account not active. Please contact your account administrator.
+        </div>
+        {% endif %}
+      {% if result %}
+      <h1 style="color:white;">Welcome, {{ result.profile.firstName }} {{ result.profile.lastName }} !</h1>
+      {% endif %}
+      <div class="row">
+        <div class="col-md-6">
+          <!-- Source: http://openclipart.org/detail/176289/top-secret-by-joshbressers-176289 -->
+        </div>
+        <div class="col-md-6">
+           <!-- <p>Logged in as User ID:  opts.user.user_id </p> -->
+        </div>
+      </div>
+    </div>
+{% endblock %}

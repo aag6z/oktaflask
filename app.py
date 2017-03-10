@@ -1,4 +1,11 @@
 # import the Flask class from the flask module
+import json
+import os
+import re
+import urllib
+import urlparse
+import requests
+
 from flask import Flask, render_template, redirect, url_for, request
 from flask_login import LoginManager
 from flask_login import current_user
@@ -6,25 +13,27 @@ from flask_login import login_required
 from flask_login import login_user
 from flask_login import logout_user
 from flask_login import AnonymousUserMixin
+from jose import jws
+from jose import jwt
 from okta import SessionsClient
-import requests
-import json
+
 
 # create the application object
 app = Flask(__name__)
 
-base_url =  'https://dev-788346.oktapreview.com'
-api_token = '00AQM7JlAklG5P-ipn2zwuXtQNDZlkAfkFkA0o6ayy'
+okta = { "base_url" : "https://dev-788346.oktapreview.com", "api_token" : "00FG7qLvuvldXlDNK9mXrUlQvcpcy7YRuwuQZKjbXy", "client_id" : "RYP9v4p5PpF9sADb5nsQ"}
+
+not_alpha_numeric = re.compile('[^a-zA-Z0-9]+')
 
 headers = {
     # "Authorization" is only needed for social transaction calls
     'Content-Type': 'application/json',
-    'Authorization': 'SSWS {}'.format(api_token),
+    'Authorization': 'SSWS {}'.format(okta["api_token"]),
 }
 
-sessionsClient = SessionsClient(base_url, api_token)
+sessionsClient = SessionsClient(okta["base_url"], okta["api_token"])
 
-app.secret_key = api_token
+app.secret_key = okta["api_token"]
 
 login_manager = LoginManager()
 login_manager.setup_app(app)
@@ -91,7 +100,7 @@ def logged_in():
 	print current_user.is_authenticated
 	opts = {'user': current_user}
 	user_id_login = current_user.user_id
-	authn_url = "{}/api/v1/users/{}".format(base_url, user_id_login)
+	authn_url = "{}/api/v1/users/{}".format(okta["base_url"], user_id_login)
 	r = requests.get(authn_url, headers=headers)
 	result = r.json()
 	return render_template('logged_in.html', opts = opts, result = result)
@@ -105,7 +114,7 @@ def logout():
 def registration():
 	if (request.method  == 'POST'):
 		payload = {'profile':{'firstName': request.form['firstName'],'lastName': request.form['lastName'], 'email': request.form['email'], 'login': request.form['login']}, 'credentials': { 'password': { 'value': request.form['password']}}}
-		authn_url = "{}/api/v1/users?activate=false".format(base_url)
+		authn_url = "{}/api/v1/users?activate=false".format(okta["base_url"])
 		r = requests.post(authn_url, headers=headers, data=json.dumps(payload))
 		result = r.json()
 		username = request.form['firstName']
@@ -116,7 +125,7 @@ def registration():
 @login_required
 def listusers():
 	opts = {'user': current_user}
-	authn_url = "{}/api/v1/users?limit=25".format(base_url)
+	authn_url = "{}/api/v1/users?limit=25".format(okta["base_url"])
 	r = requests.get(authn_url, headers=headers)
 	result = r.json()
 	return render_template('admin_list_users.html', opts = opts, results=result)
@@ -126,15 +135,15 @@ def listusers():
 def deleteuser():
 	if (request.method  == 'POST'):
 		login = request.form['login']
-		authn_url = "{}/api/v1/users?q={}".format(base_url, login)
+		authn_url = "{}/api/v1/users?q={}".format(okta["base_url"], login)
 		r = requests.get(authn_url, headers=headers)
 		result = r.json()
 		user_id = result[0]['id']
-		authn_url2 = "{}/api/v1/users/{}/lifecycle/deactivate".format(base_url, user_id)
+		authn_url2 = "{}/api/v1/users/{}/lifecycle/deactivate".format(okta["base_url"], user_id)
 		r = requests.post(authn_url2, headers=headers)
 		return redirect('/admin_list_users')
 	opts = {'user': current_user}
-	authn_url = "{}/api/v1/users?limit=25".format(base_url)
+	authn_url = "{}/api/v1/users?limit=25".format(okta["base_url"])
 	r = requests.get(authn_url, headers=headers)
 	result = r.json()
 	return render_template('delete_user.html', results=result, opts = opts)
@@ -144,19 +153,97 @@ def deleteuser():
 def changeuser():
 	if (request.method  == 'POST'):
 		login = request.form['login']
-		authn_url = "{}/api/v1/users?q={}".format(base_url, login)
+		authn_url = "{}/api/v1/users?q={}".format(okta["base_url"], login)
 		r = requests.get(authn_url, headers=headers)
 		result = r.json()
 		user_id = result[0]['id']
-		authn_url2 = "{}/api/v1/users/{}/lifecycle/reset_password?sendEmail=false".format(base_url, user_id)
+		authn_url2 = "{}/api/v1/users/{}/lifecycle/reset_password?sendEmail=false".format(okta["base_url"], user_id)
 		r = requests.post(authn_url2, headers=headers)
 		return redirect('/admin_list_users')
 	opts = {'user': current_user}
-	authn_url = "{}/api/v1/users?limit=25".format(base_url)
+	authn_url = "{}/api/v1/users?limit=25".format(okta["base_url"])
 	r = requests.get(authn_url, headers=headers)
 	result = r.json()
 	return render_template('modify_user.html', results=result, opts = opts)
 
+def domain_name_for(url):
+    second_to_last_element = -2
+    domain_parts = url.netloc.split('.')
+    (sld, tld) = domain_parts[second_to_last_element:]
+    return sld + '.' + tld
+
+
+# FIXME: Rename since this is not about public keys anymore
+def fetch_jwt_public_key_for(id_token=None):
+    if id_token is None:
+        raise NameError('id_token is required')
+
+    dirty_header = jws.get_unverified_header(id_token)
+    cleaned_key_id = None
+    if 'kid' in dirty_header:
+        dirty_key_id = dirty_header['kid']
+        cleaned_key_id = re.sub(not_alpha_numeric, '', dirty_key_id)
+    else:
+        raise ValueError('The id_token header must contain a "kid"')
+    if cleaned_key_id in public_keys:
+        return public_keys[cleaned_key_id]
+
+    unverified_claims = jwt.get_unverified_claims(id_token)
+    dirty_url = urlparse.urlparse(unverified_claims['iss'])
+    if domain_name_for(dirty_url) not in allowed_domains:
+        raise ValueError('The domain in the issuer claim is not allowed')
+    cleaned_issuer = dirty_url.geturl()
+    oidc_discovery_url = "{}/.well-known/openid-configuration".format(
+        cleaned_issuer)
+    r = requests.get(oidc_discovery_url)
+    openid_configuration = r.json()
+    jwks_uri = openid_configuration['jwks_uri']
+    r = requests.get(jwks_uri)
+    jwks = r.json()
+    for key in jwks['keys']:
+        jwk_id = key['kid']
+        public_keys[jwk_id] = key
+
+    if cleaned_key_id in public_keys:
+        return public_keys[cleaned_key_id]
+    else:
+        raise RuntimeError("Unable to fetch public key from jwks_uri")
+
+def parse_jwt(id_token):
+    public_key = fetch_jwt_public_key_for(id_token)
+    rv = jwt.decode(
+        id_token,
+        public_key,
+        algorithms='RS256',
+        issuer=okta['base_url'],
+        audience=okta['client_id'])
+    return rv
+
+@app.route("/sso/oidc", methods=['GET', 'POST'])
+def sso_oidc():
+    if 'error' in request.form:
+        flash(request.form['error_description'])
+        return redirect(url_for('home', _external=True, _scheme='https'))
+    id_token = request.form['id_token']
+    decoded = parse_jwt(id_token)
+    user_id = decoded['sub']
+    user = UserSession(user_id)
+    login_user(user)
+    return redirect(url_for('logged_in', _external=True, _scheme='https'))
+
+@app.route("/spa")
+def spa():
+    return render_template(
+        'spa.html',
+        okta=okta)
+
+@app.route("/users/me")
+def users_me():
+    authorization = request.headers.get('Authorization')
+    token = authorization.replace('Bearer ', '')
+    decoded = parse_jwt(token)
+    rv = {'user_id': decoded['sub']}
+    return flask.jsonify(**rv)
 
 # start the server with the 'run()' method
 if __name__ == '__main__':

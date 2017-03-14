@@ -5,15 +5,20 @@ function renderOktaWidget() {
         function (res) {
             if (res.status === 'SUCCESS') {
                 console.log(res);
+                console.log("HI");
                 var id_token = res.id_token || res.idToken;
+                console.log(res[0]['idToken'])
+                var id_token2 = res[0]['idToken']
+                console.log(id_token2)
                 $.ajax({
                     type: "GET",
                     dataType: 'json',
                     url: "/users/me",
                     beforeSend: function(xhr) {
-                        xhr.setRequestHeader("Authorization", "Bearer " + id_token);
+                        xhr.setRequestHeader("Authorization", "Bearer " + id_token2);
                     },
                     success: function(data){
+                        console.log("data")
                         renderLogin(data.user_id);
                     }
                 });
@@ -24,6 +29,7 @@ function renderOktaWidget() {
 }
 
 function renderLogin(user_id) {
+    console.log("hi");
     $('#navbar > ul').empty().append('<li><a id="logout" href="/logout">Log out</a></li>');
     $('#logout').click(function(event) {
         event.preventDefault();
